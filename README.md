@@ -200,6 +200,88 @@ terraform apply
 
 ---
 
+## Custom Domain (Route53 + ACM)
+
+### 1. Register/Configure Hosted Zone
+
+```bash
+# Create hosted zone (if not already registered in Route53)
+aws route53 create-hosted-zone --name lucintelsolutions.online --caller-reference $(date +%s)
+
+# Note the hosted zone ID and update your domain's nameservers at your registrar
+```
+
+### 2. Request SSL Certificate (ACM)
+
+```bash
+# Request certificate (must be in the same region as App Runner)
+aws acm request-certificate \
+  --domain-name lucintelsolutions.online \
+  --subject-alternative-names "*.lucintelsolutions.online" \
+  --validation-method DNS \
+  --region ap-south-1
+
+# Get the CNAME validation records
+aws acm describe-certificate --certificate-arn <CERT_ARN> --region ap-south-1 \
+  --query "Certificate.DomainValidationOptions[*].ResourceRecord"
+
+# Add the CNAME records to Route53 for validation
+aws route53 change-resource-record-sets --hosted-zone-id <ZONE_ID> --change-batch '{
+  "Changes": [{
+    "Action": "CREATE",
+    "ResourceRecordSet": {
+      "Name": "<CNAME_NAME>",
+      "Type": "CNAME",
+      "TTL": 300,
+      "ResourceRecords": [{"Value": "<CNAME_VALUE>"}]
+    }
+  }]
+}'
+```
+
+### 3. Link Custom Domain to App Runner
+
+```bash
+# Associate domain with App Runner service
+aws apprunner associate-custom-domain \
+  --service-arn <PROD_SERVICE_ARN> \
+  --domain-name lucintelsolutions.online \
+  --region ap-south-1
+
+# Get the CNAME/alias targets provided by App Runner
+aws apprunner describe-custom-domains --service-arn <PROD_SERVICE_ARN> --region ap-south-1
+```
+
+### 4. Add DNS Records
+
+Add the CNAME records provided by App Runner to your Route53 hosted zone:
+
+```bash
+aws route53 change-resource-record-sets --hosted-zone-id <ZONE_ID> --change-batch '{
+  "Changes": [{
+    "Action": "CREATE",
+    "ResourceRecordSet": {
+      "Name": "lucintelsolutions.online",
+      "Type": "CNAME",
+      "TTL": 300,
+      "ResourceRecords": [{"Value": "<APPRUNNER_CNAME_TARGET>"}]
+    }
+  }]
+}'
+```
+
+### 5. Verify
+
+```bash
+# Check domain status
+aws apprunner describe-custom-domains --service-arn <PROD_SERVICE_ARN> --region ap-south-1
+
+# Test
+curl -I https://lucintelsolutions.online
+```
+
+---
+
 ## GitHub Secrets Required
 
 Set these in repo Settings → Secrets → Actions:
