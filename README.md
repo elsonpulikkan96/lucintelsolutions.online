@@ -8,6 +8,32 @@ Production-grade React application deployed on AWS App Runner with CI/CD.
 
 ---
 
+## Deployment Flow
+
+```
+1. DEVELOP        →  2. PR & REVIEW     →  3. CI/CD BUILD     →  4. REGISTRY       →  5. DEPLOY          →  6. SERVE
+─────────────────    ─────────────────      ─────────────────     ─────────────────     ─────────────────     ─────────────────
+Developer writes     Open PR to dev/main    GitHub Actions         Push image to         App Runner auto-      Route53 + ACM
+code on feature      Branch protection      triggers on merge:     AWS ECR with          deploys new image     routes custom
+branch locally       enforces:              • npm ci               environment tag:      to running service:   domain with SSL:
+                     • 1 approval           • npm run build        • :dev                • lucintelsolutions   • lucintelsolutions
+                     • CI check pass        • docker build         • :prod               • lucintelsolutions     .online
+                     • Up-to-date branch      (linux/amd64)                                -dev
+```
+
+### Step-by-Step Process
+
+| Step | Action | Trigger | Result |
+|------|--------|---------|--------|
+| 1 | Developer creates feature branch and pushes code | `git push` | Code on GitHub |
+| 2 | Open Pull Request to `dev` or `main` | `gh pr create` | PR validation workflow runs (build + Docker check) |
+| 3 | Reviewer approves + CI passes | PR merge | Deploy workflow triggers |
+| 4 | GitHub Actions builds Docker image (linux/amd64) | Auto on merge | Image pushed to ECR with `:dev` or `:prod` tag |
+| 5 | App Runner detects new image in ECR | Auto-deploy enabled | New container version goes live (~2-3 min) |
+| 6 | Route53 resolves custom domain → App Runner | DNS CNAME | Users access `https://lucintelsolutions.online` |
+
+---
+
 ## Architecture
 
 ```
