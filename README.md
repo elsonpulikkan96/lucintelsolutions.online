@@ -1,65 +1,257 @@
-# Lucintel Solutions — Website
+# Lucintel Solutions
 
-A modern, responsive React website for Lucintel Solutions.
+Production-grade React application deployed on AWS App Runner with CI/CD.
 
-## Getting Started
-
-### Prerequisites
-- Node.js 16+ installed
-- npm or yarn
-
-### Install & Run
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm start
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Build for Production
-
-```bash
-npm run build
-```
-
-The `build/` folder contains the production-ready files to deploy.
+**Live URLs:**
+- Prod: https://npmn4xpnur.ap-south-1.awsapprunner.com
+- Dev: https://fwtycbhtd3.ap-south-1.awsapprunner.com
 
 ---
 
-## Project Structure
+## Architecture
 
 ```
-src/
-├── components/
-│   ├── Navbar.js / .css        — Fixed navigation with mobile menu
-│   ├── Logo.js                 — SVG logo component
-│   ├── Hero.js / .css          — Full-screen hero section
-│   ├── Countries.js / .css     — Countries bar (6 countries)
-│   ├── Services.js / .css      — Filterable services grid
-│   ├── WhyUs.js / .css         — Why Lucintel section with metrics
-│   ├── Process.js / .css       — 4-step process section
-│   ├── Testimonials.js / .css  — Client reviews
-│   ├── Contact.js / .css       — Contact form + details
-│   └── Footer.js / .css        — Footer with links
-├── hooks/
-│   └── useReveal.js            — Scroll reveal animation hook
-├── App.js                      — Root component
-├── index.js                    — Entry point
-└── index.css                   — Global styles & CSS variables
+GitHub (main/dev) → GitHub Actions → ECR → App Runner (auto-deploy)
 ```
 
-## Brand Colors
-- Sky Blue: `#3AABDC`
-- Lime Green: `#8DC63F`
-- Charcoal: `#404040`
-- Soft Grey: `#6E6E6E`
-- Deep Navy: `#1A2E3B`
+## Tech Stack
 
-## Contact
-- Phone: +91 62380 97506
-- Email: info@lucintelsolutions.online
-- Address: Near Bharat Matha College, Thrikkakara, Ernakulam, Kerala, India
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 18 |
+| Web Server | Nginx 1.27 Alpine |
+| Container | Docker (multi-stage, 75 MB) |
+| Registry | AWS ECR |
+| Hosting | AWS App Runner |
+| CI/CD | GitHub Actions |
+| IaC | Terraform |
+
+---
+
+## Prerequisites
+
+- Node.js 20+
+- Docker Desktop
+- AWS CLI configured (`aws configure`)
+- GitHub CLI (`gh auth login`)
+- Terraform 1.5+
+
+---
+
+## Local Development
+
+```bash
+# Clone the repo
+git clone https://github.com/elsonpulikkan96/lucintelsolutions.online.git
+cd lucintelsolutions.online
+
+# Install dependencies
+npm install
+
+# Start dev server
+npm start
+# App runs at http://localhost:3000
+```
+
+---
+
+## Docker (Local)
+
+```bash
+# Build
+docker build --platform linux/amd64 -t lucintelsolutions.online:prod .
+
+# Run
+docker run -d -p 80:80 lucintelsolutions.online:prod
+
+# Verify
+curl http://localhost
+```
+
+---
+
+## Git Workflow
+
+### Branch Strategy
+
+| Branch | Environment | Trigger |
+|--------|-------------|---------|
+| `main` | Production | Push/merge → auto-deploy |
+| `dev` | Development | Push/merge → auto-deploy |
+
+### Making Changes
+
+```bash
+# 1. Create feature branch from dev
+git checkout dev
+git pull
+git checkout -b feature/my-feature
+
+# 2. Make changes and commit
+git add .
+git commit -m "feat: description"
+
+# 3. Push and create PR to dev
+git push -u origin feature/my-feature
+gh pr create --base dev --title "feat: description"
+
+# 4. After approval + CI pass → merge to dev (deploys to dev)
+
+# 5. Promote to prod: create PR from dev to main
+gh pr create --base main --head dev --title "Release: description"
+
+# 6. After approval + CI pass → merge to main (deploys to prod)
+```
+
+### Branch Protection Rules (main & dev)
+
+- No direct pushes — PRs required
+- 1 approval required
+- CI check (`validate`) must pass
+- Branch must be up-to-date before merge
+- Force pushes blocked
+
+---
+
+## CI/CD Pipeline
+
+### PR Validation (`pr-validate.yml`)
+
+Runs on every PR to `main` or `dev`:
+1. Checkout code
+2. Install dependencies (`npm ci`)
+3. Build React app (`npm run build`)
+4. Verify Docker build
+
+### Deploy (`deploy.yml`)
+
+Runs on push to `main` or `dev`:
+1. Checkout code
+2. Configure AWS credentials
+3. Login to ECR
+4. Build Docker image (linux/amd64)
+5. Push to ECR with environment tag (`prod` or `dev`)
+6. App Runner auto-deploys new image
+
+---
+
+## Infrastructure (Terraform)
+
+### Setup from Scratch
+
+```bash
+cd infra
+
+# Initialize Terraform
+terraform init
+
+# Preview changes
+terraform plan
+
+# Apply infrastructure
+terraform apply
+```
+
+### Import Existing Resources
+
+If infrastructure was created manually:
+
+```bash
+cd infra
+terraform init
+
+terraform import aws_ecr_repository.app lucintelsolutions
+terraform import aws_iam_role.apprunner_ecr AppRunnerECRAccessRole
+terraform import 'aws_apprunner_service.app["prod"]' arn:aws:apprunner:ap-south-1:739275449845:service/lucintelsolutions/6f9541de957f412f87c61d22646bbbd8
+terraform import 'aws_apprunner_service.app["dev"]' arn:aws:apprunner:ap-south-1:739275449845:service/lucintelsolutions-dev/18a2bbd3ad6c441598fbb877354315d0
+```
+
+### AWS Resources Created
+
+| Resource | Name | Purpose |
+|----------|------|---------|
+| ECR Repository | `lucintelsolutions` | Container image registry |
+| IAM Role | `AppRunnerECRAccessRole` | App Runner → ECR access |
+| App Runner | `lucintelsolutions` | Prod hosting |
+| App Runner | `lucintelsolutions-dev` | Dev hosting |
+
+### ECR Lifecycle Policy
+
+- Untagged images auto-deleted after 7 days
+- Image scanning enabled on push
+
+---
+
+## Docker Image Details
+
+### Dockerfile (Multi-stage)
+
+**Stage 1 — Build:**
+- Base: `node:20-alpine`
+- Installs deps with `npm ci --ignore-scripts`
+- Builds production React bundle
+
+**Stage 2 — Serve:**
+- Base: `nginx:1.27-alpine`
+- Custom Nginx config with security headers
+- Serves static build output on port 80
+
+### Security Headers
+
+| Header | Value |
+|--------|-------|
+| X-Frame-Options | SAMEORIGIN |
+| X-Content-Type-Options | nosniff |
+| X-XSS-Protection | 1; mode=block |
+| Referrer-Policy | strict-origin-when-cross-origin |
+| Permissions-Policy | camera=(), microphone=(), geolocation=() |
+
+### Performance
+
+- Gzip compression enabled
+- Static assets cached for 1 year (immutable)
+- Final image size: 75 MB
+
+---
+
+## GitHub Secrets Required
+
+Set these in repo Settings → Secrets → Actions:
+
+| Secret | Description |
+|--------|-------------|
+| `AWS_ACCESS_KEY_ID` | IAM user access key |
+| `AWS_SECRET_ACCESS_KEY` | IAM user secret key |
+
+---
+
+## Useful Commands
+
+```bash
+# Check App Runner status
+aws apprunner list-services --region ap-south-1
+
+# View ECR images
+aws ecr list-images --repository-name lucintelsolutions --region ap-south-1
+
+# Clean untagged ECR images manually
+aws ecr batch-delete-image --repository-name lucintelsolutions --region ap-south-1 \
+  --image-ids "$(aws ecr list-images --repository-name lucintelsolutions --region ap-south-1 --filter tagStatus=UNTAGGED --query 'imageIds' --output json)"
+
+# View GitHub Actions runs
+gh run list
+
+# Check branch protection
+gh api repos/elsonpulikkan96/lucintelsolutions.online/branches/main/protection
+```
+
+---
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| App Runner deploy fails | Check image is built for `linux/amd64`, not ARM |
+| `npm ci` fails in Docker | Regenerate `package-lock.json` with `npm install --package-lock-only` |
+| PR checks not blocking | Branch protection requires public repo (done) |
+| ECR push denied | Run `aws ecr get-login-password --region ap-south-1 \| docker login ...` |
