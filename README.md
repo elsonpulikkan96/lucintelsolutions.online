@@ -152,20 +152,6 @@ terraform plan
 terraform apply
 ```
 
-### Import Existing Resources
-
-If infrastructure was created manually:
-
-```bash
-cd infra
-terraform init
-
-terraform import aws_ecr_repository.app lucintelsolutions
-terraform import aws_iam_role.apprunner_ecr AppRunnerECRAccessRole
-terraform import 'aws_apprunner_service.app["prod"]' arn:aws:apprunner:ap-south-1:739275449845:service/lucintelsolutions/6f9541de957f412f87c61d22646bbbd8
-terraform import 'aws_apprunner_service.app["dev"]' arn:aws:apprunner:ap-south-1:739275449845:service/lucintelsolutions-dev/18a2bbd3ad6c441598fbb877354315d0
-```
-
 ### AWS Resources Created
 
 | Resource | Name | Purpose |
