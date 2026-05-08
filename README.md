@@ -11,7 +11,62 @@ Production-grade React application deployed on AWS App Runner with CI/CD.
 ## Architecture
 
 ```
-GitHub (main/dev) → GitHub Actions → ECR → App Runner (auto-deploy)
+┌─────────────────────────────────────────────────────────────────────┐
+│                          DEVELOPER WORKFLOW                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  feature branch ──► PR to dev ──► PR to main                       │
+│                        │               │                            │
+│                   [CI: validate]   [CI: validate]                   │
+│                   [1 approval]     [1 approval]                     │
+│                        │               │                            │
+│                        ▼               ▼                            │
+│                   merge to dev    merge to main                     │
+│                        │               │                            │
+├────────────────────────┼───────────────┼────────────────────────────┤
+│                   GITHUB ACTIONS CI/CD                               │
+├────────────────────────┼───────────────┼────────────────────────────┤
+│                        │               │                            │
+│                  Build Docker     Build Docker                       │
+│                  (linux/amd64)   (linux/amd64)                      │
+│                        │               │                            │
+│                        ▼               ▼                            │
+│                   Push :dev        Push :prod                       │
+│                     tag              tag                            │
+│                        │               │                            │
+├────────────────────────┼───────────────┼────────────────────────────┤
+│                          AWS (ap-south-1)                            │
+├────────────────────────┼───────────────┼────────────────────────────┤
+│                        │               │                            │
+│                        ▼               ▼                            │
+│                 ┌─────────────────────────────┐                     │
+│                 │         AWS ECR             │                     │
+│                 │   lucintelsolutions:dev     │                     │
+│                 │   lucintelsolutions:prod    │                     │
+│                 └──────────┬──────────┬───────┘                     │
+│                            │          │                             │
+│                  (auto-deploy)  (auto-deploy)                       │
+│                            │          │                             │
+│                            ▼          ▼                             │
+│              ┌──────────────┐  ┌──────────────┐                    │
+│              │  App Runner  │  │  App Runner  │                    │
+│              │     DEV      │  │     PROD     │                    │
+│              └──────┬───────┘  └──────┬───────┘                    │
+│                     │                 │                             │
+│                     ▼                 ▼                             │
+│              fwtycbhtd3...     npmn4xpnur...                        │
+│              .awsapprunner     .awsapprunner                        │
+│                                       │                             │
+│                                       ▼                             │
+│                          ┌────────────────────┐                    │
+│                          │  Route53 + ACM     │                    │
+│                          │  (custom domain)   │                    │
+│                          └────────────────────┘                    │
+│                                       │                             │
+│                                       ▼                             │
+│                          lucintelsolutions.online                   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Tech Stack
