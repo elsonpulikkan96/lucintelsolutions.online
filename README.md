@@ -282,17 +282,6 @@ curl -I https://lucintelsolutions.online
 
 ---
 
-## GitHub Secrets Required
-
-Set these in repo Settings → Secrets → Actions:
-
-| Secret | Description |
-|--------|-------------|
-| `AWS_ACCESS_KEY_ID` | IAM user access key |
-| `AWS_SECRET_ACCESS_KEY` | IAM user secret key |
-
----
-
 ## Useful Commands
 
 ```bash
